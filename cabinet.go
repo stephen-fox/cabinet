@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// Exists checks if a file exists.
+// Exists checks if a file or directory exists.
 //
 // Based on work by "Mostafa": https://stackoverflow.com/a/10510783
 func Exists(path string) bool {
@@ -25,9 +25,81 @@ func Exists(path string) bool {
 	return true
 }
 
-// CopyDirectory copies the source directory into the destination directory.
-// If the destination does not exist, the function will automatically
-// create it.
+// FileExists checks if a file exists.
+//
+// Based on work by "Mostafa": https://stackoverflow.com/a/10510783
+func FileExists(path string) bool {
+	file, err := os.Stat(path)
+	if err == nil {
+		return true
+	}
+	if os.IsNotExist(err) {
+		return false
+	}
+	if file.IsDir() {
+		return false
+	}
+	return true
+}
+
+// DirectoryExists checks if a directory exists.
+//
+// Based on work by "Mostafa": https://stackoverflow.com/a/10510783
+func DirectoryExists(path string) bool {
+	file, err := os.Stat(path)
+	if err == nil {
+		return true
+	}
+	if os.IsNotExist(err) {
+		return false
+	}
+	if !file.IsDir() {
+		return false
+	}
+	return true
+}
+
+//
+func CopyFilesWithSuffix(sourceDirPath string, desinationDirPath string, suffix string, levels int) error {
+	sourceDir, err := os.Stat(sourceDirPath)
+	if err != nil {
+		return err
+	}
+
+	err = os.MkdirAll(desinationDirPath, sourceDir.Mode())
+	if err != nil {
+		return err
+	}
+
+	files, err := ioutil.ReadDir(sourceDirPath)
+	if err != nil {
+		return err
+	}
+
+	currentLevel := 0
+
+	for _, file := range files {
+		if file.IsDir() {
+			err := CopyFilesWithSuffix(file.Name(), desinationDirPath)
+		} else {
+			if strings.HasSuffix(file.Name(), suffix) {
+				err := CopyFile(file.Name(), desinationDirPath)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// CopyDirectory recursively copies the source directory into the destination
+// directory. If the destination does not exist, the function will
+// automatically create it.
+//
+// For example, given a source of '/home/user1' and a destination of
+// '/tmp', the result is '/tmp/user1'.
 func CopyDirectory(sourceDirPath string, destinationDirPath string) error {
 	directory, err := os.Stat(sourceDirPath)
 	if err != nil {
@@ -68,6 +140,9 @@ func CopyDirectory(sourceDirPath string, destinationDirPath string) error {
 }
 
 // CopyFile copies the source file into the destination path.
+//
+// For example, given a source of '/home/user/junk.txt' and a destination of
+// '/tmp', the result is '/tmp/junk.txt'.
 //
 // Based on work by "Salvador Dali": https://stackoverflow.com/a/33865286
 func CopyFile(sourceFilePath string, destinationDirPath string) error {
@@ -136,8 +211,7 @@ func DownloadFile(url string, fileDownloadPath string) error {
 }
 
 // ReplaceLineInFile replaces a line in a file with the desired string. If
-// the replacement string already exists, then the function
-// immediately returns.
+// the replacement string already exists, then the function does nothing.
 func ReplaceLineInFile(path string, match string, replacement string,
 	lineEnding string) (wasReplaced bool, err error) {
 
