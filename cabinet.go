@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// Exists checks if a file exists.
+// Exists checks if a file or directory exists.
 //
 // Based on work by "Mostafa": https://stackoverflow.com/a/10510783
 func Exists(path string) bool {
@@ -25,22 +25,86 @@ func Exists(path string) bool {
 	return true
 }
 
-// CopyDirectory copies the source directory into the destination directory.
-// If the destination does not exist, the function will automatically
-// create it.
-func CopyDirectory(sourceDirPath string, destinationDirPath string) error {
-	directory, err := os.Stat(sourceDirPath)
+// FileExists checks if a file exists.
+//
+// Based on work by "Mostafa": https://stackoverflow.com/a/10510783
+func FileExists(path string) bool {
+	file, err := os.Stat(path)
+	if err == nil {
+		return true
+	}
+	if os.IsNotExist(err) {
+		return false
+	}
+	if file.IsDir() {
+		return false
+	}
+	return true
+}
+
+// DirectoryExists checks if a directory exists.
+//
+// Based on work by "Mostafa": https://stackoverflow.com/a/10510783
+func DirectoryExists(path string) bool {
+	file, err := os.Stat(path)
+	if err == nil {
+		return true
+	}
+	if os.IsNotExist(err) {
+		return false
+	}
+	if !file.IsDir() {
+		return false
+	}
+	return true
+}
+
+// CopyFilesWithSuffix recursively copies all files ending with a specific
+// suffix into the destination path. If the destination does not exist, the
+// function will automatically create it. For example, given a source of
+// '/home/user1' and a destination of '/tmp/hello', the resulting directory
+// would be '/tmp/hello'.
+func CopyFilesWithSuffix(sourceDirPath string, destinationDirPath string, suffix string, shouldOverwrite bool) error {
+	contents, err := ioutil.ReadDir(sourceDirPath)
 	if err != nil {
 		return err
 	}
 
-	if !directory.IsDir() {
-		return errors.New("Failed to copy directory. Source is not a directory")
+	for _, content := range contents {
+		filePath := sourceDirPath + "/" + content.Name()
+		if content.IsDir() {
+			nextDir := destinationDirPath + "/" + content.Name()
+			err := CopyFilesWithSuffix(filePath, nextDir, suffix, shouldOverwrite)
+			if err != nil {
+				return err
+			}
+		} else {
+			if strings.HasSuffix(content.Name(), suffix) {
+				err = CopyFile(filePath, destinationDirPath, shouldOverwrite)
+				if err != nil {
+					return err
+				}
+			}
+		}
 	}
 
-	err = os.MkdirAll(destinationDirPath, directory.Mode())
+	return nil
+}
+
+// CopyDirectory recursively copies the source directory's contents into the
+// destination directory. If the destination does not exist, the function will
+// automatically create it. For example, given a source directory of
+// '/home/user1' and a destination of '/tmp/junk', the resulting directory
+// would be '/tmp/junk'.
+func CopyDirectory(sourceDirPath string, destinationDirPath string, shouldOverwrite bool) error {
+	sourceDirInfo, err := os.Stat(sourceDirPath)
 	if err != nil {
 		return err
+	}
+
+	if !sourceDirInfo.IsDir() {
+		return errors.New("Failed to copy directory, '" + sourceDirPath +
+			"' is not a directory")
 	}
 
 	directoryContents, err := ioutil.ReadDir(sourceDirPath)
@@ -49,15 +113,15 @@ func CopyDirectory(sourceDirPath string, destinationDirPath string) error {
 	}
 
 	for _, content := range directoryContents {
-		sourcePath := sourceDirPath + "/" + content.Name()
+		contentPath := sourceDirPath + "/" + content.Name()
 		if content.IsDir() {
 			destinationPath := destinationDirPath + "/" + content.Name()
-			err = CopyDirectory(sourcePath, destinationPath)
+			err = CopyDirectory(contentPath, destinationPath, shouldOverwrite)
 			if err != nil {
 				return err
 			}
 		} else {
-			err = CopyFile(sourcePath, destinationDirPath)
+			err = CopyFile(contentPath, destinationDirPath, shouldOverwrite)
 			if err != nil {
 				return err
 			}
@@ -67,29 +131,47 @@ func CopyDirectory(sourceDirPath string, destinationDirPath string) error {
 	return nil
 }
 
-// CopyFile copies the source file into the destination path.
+// CopyFile copies the source file into the destination path. For example,
+// given a source of '/home/user/junk.txt' and a destination of '/tmp/test',
+// the resulting file would be '/tmp/test/junk.txt'.
 //
 // Based on work by "Salvador Dali": https://stackoverflow.com/a/33865286
-func CopyFile(sourceFilePath string, destinationDirPath string) error {
+func CopyFile(sourceFilePath string, destinationDirPath string, shouldOverwrite bool) error {
+	sourceFileInfo, err := os.Stat(sourceFilePath)
+	if err != nil {
+		return err
+	}
+
+	fullDestinationPath := destinationDirPath + "/" + sourceFileInfo.Name()
+	if !shouldOverwrite && Exists(fullDestinationPath) {
+		return errors.New("File '" + sourceFileInfo.Name() +
+			"' already exists in destination directory '" +
+			destinationDirPath + "'")
+	}
+
+	parentDirInfo, err := os.Stat(path.Dir(sourceFilePath))
+	if err != nil {
+		return err
+	}
+
+	err = os.MkdirAll(destinationDirPath, parentDirInfo.Mode())
+	if err != nil {
+		return err
+	}
+
+	destFile, err := os.Create(fullDestinationPath)
+	if err == nil {
+		os.Chmod(fullDestinationPath, sourceFileInfo.Mode())
+	} else {
+		return err
+	}
+	defer destFile.Close()
+
 	sourceFile, err := os.Open(sourceFilePath)
 	if err != nil {
 		return err
 	}
 	defer sourceFile.Close()
-
-	fileInfo, err := os.Stat(sourceFilePath)
-	if err != nil {
-		return err
-	}
-
-	fullDestinationPath := destinationDirPath + "/" + path.Base(sourceFilePath)
-	destFile, err := os.Create(fullDestinationPath)
-	if err == nil {
-		os.Chmod(fullDestinationPath, fileInfo.Mode())
-	} else {
-		return err
-	}
-	defer destFile.Close()
 
 	_, err = io.Copy(destFile, sourceFile)
 	if err != nil {
@@ -136,8 +218,7 @@ func DownloadFile(url string, fileDownloadPath string) error {
 }
 
 // ReplaceLineInFile replaces a line in a file with the desired string. If
-// the replacement string already exists, then the function
-// immediately returns.
+// the replacement string already exists, then the function does nothing.
 func ReplaceLineInFile(path string, match string, replacement string,
 	lineEnding string) (wasReplaced bool, err error) {
 
