@@ -12,6 +12,21 @@ go get github.com/stephen-fox/cabinet
 Then, in your Go application, add the following import statement:
 ```
 import (
-    github.com/stephen-fox/cabinet
+    "github.com/stephen-fox/cabinet"
 )
 ```
+
+## API sample
+Here is a sample of the functionality that the library exposes:
+
+* `Exists` - Check if a file or directory exists
+* `FileExists` - Check if a file exists
+* `DirectoryExists` - Check if a directory exists
+* `CopyFilesWithSuffix` - Recursively copy files ending with a suffix.
+Optionally specify if existing files should be overwritten
+* `CopyDirectory` - Recursively copy a directory. Optionally specify if
+existing files should be overwritten
+* `CopyFile` - Copy a file. Optionally specify if an existing file should
+be overwritten
+* `DownloadFile` - Download a file
+* `ReplaceLineInFile` - Replace a line in a file
