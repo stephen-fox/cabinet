@@ -16,8 +16,7 @@ import (
 )
 ```
 
-## API sample
-Here is a sample of the functionality that the library exposes:
+## What does the API look like?
 
 * `Exists` - Check if a file or directory exists
 * `FileExists` - Check if a file exists
