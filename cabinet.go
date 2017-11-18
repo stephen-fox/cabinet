@@ -187,20 +187,19 @@ func CopyFile(sourceFilePath string, destinationDirPath string, shouldOverwrite 
 }
 
 // DownloadFile downloads a file to the destination. The resulting file's name
-// must be specified in the download path.
+// must be specified in the download path. The total time allowed for the
+// download must also be specified.
 //
 // Based on work by "Pablo Jomer": https://stackoverflow.com/a/33845771
-func DownloadFile(url string, fileDownloadPath string) error {
-	// Create the file.
+func DownloadFile(url string, fileDownloadPath string, timeLimit time.Duration) error {
 	out, err := os.Create(fileDownloadPath)
 	if err != nil {
 		return err
 	}
 	defer out.Close()
 
-	// Get the data.
 	var client = &http.Client{
-		Timeout: time.Second * 10,
+		Timeout: timeLimit,
 	}
 	resp, err := client.Get(url)
 	if err != nil {
@@ -208,7 +207,6 @@ func DownloadFile(url string, fileDownloadPath string) error {
 	}
 	defer resp.Body.Close()
 
-	// Writer the body to file.
 	_, err = io.Copy(out, resp.Body)
 	if err != nil {
 		return err
