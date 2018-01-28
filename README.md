@@ -29,3 +29,4 @@ existing files should be overwritten
 be overwritten
 * `DownloadFile` - Download a file
 * `ReplaceLineInFile` - Replace a line in a file
+* `GetFileHash` - Get a file's hash using the `hash.Hash` interface

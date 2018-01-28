@@ -1,6 +1,7 @@
 package cabinet
 
 import (
+	"encoding/hex"
 	"errors"
 	"io"
 	"io/ioutil"
@@ -9,6 +10,11 @@ import (
 	"path"
 	"strings"
 	"time"
+	"hash"
+)
+
+const (
+	ErrorFileExceedsMaximumSize = "The file's size exceeds the specified size"
 )
 
 // Exists checks if a file or directory exists.
@@ -19,9 +25,11 @@ func Exists(path string) bool {
 	if err == nil {
 		return true
 	}
+
 	if os.IsNotExist(err) {
 		return false
 	}
+
 	return true
 }
 
@@ -33,12 +41,15 @@ func FileExists(path string) bool {
 	if err == nil {
 		return true
 	}
+
 	if os.IsNotExist(err) {
 		return false
 	}
+
 	if file.IsDir() {
 		return false
 	}
+
 	return true
 }
 
@@ -201,6 +212,7 @@ func DownloadFile(url string, fileDownloadPath string, timeLimit time.Duration) 
 	var client = &http.Client{
 		Timeout: timeLimit,
 	}
+
 	resp, err := client.Get(url)
 	if err != nil {
 		return err
@@ -217,12 +229,17 @@ func DownloadFile(url string, fileDownloadPath string, timeLimit time.Duration) 
 
 // ReplaceLineInFile replaces a line in a file with the desired string. If
 // the replacement string already exists, then the function does nothing.
+// A maximum file size can be specified to avoid reading in large files.
 func ReplaceLineInFile(path string, match string, replacement string,
-	lineEnding string) (wasReplaced bool, err error) {
+	lineEnding string, maxFileSize int64) (wasReplaced bool, err error) {
 
 	fileInfo, err := os.Stat(path)
 	if err != nil {
 		return false, err
+	}
+
+	if fileInfo.Size() > maxFileSize {
+		return false, errors.New(ErrorFileExceedsMaximumSize)
 	}
 
 	contents, err := ioutil.ReadFile(path)
@@ -248,4 +265,22 @@ func ReplaceLineInFile(path string, match string, replacement string,
 	}
 
 	return true, nil
+}
+
+// GetFileHash gets a file's hash given a 'Hash' interface.
+// For example, you can get a SHA256 hash as follows:
+// sha256Hash, err := GetFileHash("/path/to/file", sha256.New())
+func GetFileHash(filePath string, hash hash.Hash) (string, error) {
+	target, err := os.OpenFile(filePath, os.O_RDONLY, 0)
+	if err != nil {
+		return "", err
+	}
+	defer target.Close()
+
+	_, err = io.Copy(hash, target)
+	if err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(hash.Sum(nil)), nil
 }
