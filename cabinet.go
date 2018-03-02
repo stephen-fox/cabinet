@@ -3,14 +3,15 @@ package cabinet
 import (
 	"encoding/hex"
 	"errors"
+	"hash"
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"strings"
 	"time"
-	"hash"
 )
 
 const (
@@ -61,12 +62,15 @@ func DirectoryExists(path string) bool {
 	if err == nil {
 		return true
 	}
+
 	if os.IsNotExist(err) {
 		return false
 	}
+
 	if !file.IsDir() {
 		return false
 	}
+
 	return true
 }
 
@@ -202,7 +206,7 @@ func CopyFile(sourceFilePath string, destinationDirPath string, shouldOverwrite 
 // download must also be specified.
 //
 // Based on work by "Pablo Jomer": https://stackoverflow.com/a/33845771
-func DownloadFile(url string, fileDownloadPath string, timeLimit time.Duration) error {
+func DownloadFile(fileUrl *url.URL, fileDownloadPath string, timeLimit time.Duration) error {
 	out, err := os.Create(fileDownloadPath)
 	if err != nil {
 		return err
@@ -213,13 +217,13 @@ func DownloadFile(url string, fileDownloadPath string, timeLimit time.Duration) 
 		Timeout: timeLimit,
 	}
 
-	resp, err := client.Get(url)
+	response, err := client.Get(fileUrl.String())
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer response.Body.Close()
 
-	_, err = io.Copy(out, resp.Body)
+	_, err = io.Copy(out, response.Body)
 	if err != nil {
 		return err
 	}
