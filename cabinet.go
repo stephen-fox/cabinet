@@ -231,8 +231,8 @@ func DownloadFile(fileUrl *url.URL, fileDownloadPath string, timeLimit time.Dura
 	return nil
 }
 
-// ReplaceLineInFile replaces a line in a file with the desired string. If
-// the replacement string already exists, then the function does nothing.
+// ReplaceLineInFile replaces a single line in a file with the desired string.
+// If the replacement string already exists, then the function does nothing.
 // A maximum file size can be specified to avoid reading in large files.
 func ReplaceLineInFile(path string, match string, replacement string,
 	lineEnding string, maxFileSize int64) (wasReplaced bool, err error) {
@@ -252,23 +252,30 @@ func ReplaceLineInFile(path string, match string, replacement string,
 	}
 
 	lines := strings.Split(string(contents), lineEnding)
+
 	for i, line := range lines {
 		// Skip replacement if the file already contains the replacement.
-		if strings.EqualFold(line, replacement) {
+		if line == replacement {
 			return false, nil
 		}
+
 		if strings.Contains(line, match) {
 			lines[i] = replacement
+			wasReplaced = true
+			break
 		}
 	}
 
-	newContents := strings.Join(lines, lineEnding)
-	err = ioutil.WriteFile(path, []byte(newContents), fileInfo.Mode())
-	if err != nil {
-		return false, err
+	if wasReplaced {
+		newContents := strings.Join(lines, lineEnding)
+
+		err := ioutil.WriteFile(path, []byte(newContents), fileInfo.Mode())
+		if err != nil {
+			return false, err
+		}
 	}
 
-	return true, nil
+	return wasReplaced, nil
 }
 
 // GetFileHash gets a file's hash given a 'Hash' interface.
